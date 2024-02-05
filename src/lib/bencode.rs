@@ -34,12 +34,21 @@ impl<'data> BencodeParser<'data> {
 
     fn parse(&mut self) -> Result<Value, BencodeParserError> {
         match self.data[self.ptr] as char {
-            'i' => self.consume_integer(),
-            _ => unimplemented!(),
+            'i' => Ok(Value::Integer(self.consume_integer()?)),
+            c => {
+                if c.is_ascii_digit() {
+                    Ok(Value::Bytes(self.consume_bytes()?))
+                } else {
+                    Err(BencodeParserError {
+                        error: format!("Unexpected {}", c),
+                        pos: self.ptr,
+                    })
+                }
+            }
         }
     }
 
-    fn consume_integer(&mut self) -> Result<Value, BencodeParserError> {
+    fn consume_integer(&mut self) -> Result<i64, BencodeParserError> {
         let Self { data, ptr } = self;
 
         *ptr += 1; // Skip the 'i'
@@ -59,8 +68,35 @@ impl<'data> BencodeParser<'data> {
                 pos: *ptr,
             })?;
 
-        *ptr += integer_length;
+        *ptr += integer_length + 1;
 
-        Ok(Value::Integer(integer))
+        Ok(integer)
+    }
+
+    fn consume_bytes(&mut self) -> Result<Vec<u8>, BencodeParserError> {
+        let Self { data, ptr } = self;
+
+        let len = {
+            let str = data[*ptr..]
+                .iter()
+                .take_while(|c| **c as char != ':')
+                .map(|x| *x as char)
+                .collect::<String>();
+
+            let len: usize = str
+                .parse()
+                .map_err(|_|
+                    BencodeParserError {
+                        error: format!("Failed to parse bytestring length {}", str),
+                        pos: *ptr,
+                    }
+                )?;
+
+            *ptr += str.len() + 1;
+
+            len
+        };
+
+        Ok(data[(*ptr)..(*ptr + len)].to_owned())
     }
 }
