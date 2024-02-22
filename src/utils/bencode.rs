@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
-
 #[derive(Debug)]
-pub enum Value {
+pub enum BencodeValue {
     Integer(i64),
     Bytes(Vec<u8>),
-    List(Vec<Value>),
-    Dict(HashMap<Vec<u8>, Value>),
+    List(Vec<BencodeValue>),
+    Dict(HashMap<Vec<u8>, BencodeValue>),
 }
 
-impl TryFrom<&[u8]> for Value {
+impl TryFrom<&[u8]> for BencodeValue {
     type Error = BencodeParserError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -17,35 +16,80 @@ impl TryFrom<&[u8]> for Value {
     }
 }
 
+#[derive(Debug)]
 pub struct BencodeParserError {
     error: String,
     pos: usize,
 }
 
-struct BencodeParser<'data> {
+#[derive(Debug)]
+pub struct BencodeParser<'data> {
     data: &'data [u8],
     ptr: usize,
 }
 
 impl<'data> BencodeParser<'data> {
-    fn new(data: &'data [u8]) -> Self {
+    pub fn new(data: &'data [u8]) -> Self {
         Self { data, ptr: 0 }
     }
 
-    fn parse(&mut self) -> Result<Value, BencodeParserError> {
+    pub fn parse_value(&mut self) -> Result<BencodeValue, BencodeParserError> {
         match self.data[self.ptr] as char {
-            'i' => Ok(Value::Integer(self.consume_integer()?)),
+            'i' => Ok(BencodeValue::Integer(self.consume_integer()?)),
+            'l' => Ok(BencodeValue::List(self.consume_list()?)),
+            'd' => Ok(BencodeValue::Dict(self.consume_dict()?)),
             c => {
                 if c.is_ascii_digit() {
-                    Ok(Value::Bytes(self.consume_bytes()?))
+                    Ok(BencodeValue::Bytes(self.consume_bytes()?))
                 } else {
                     Err(BencodeParserError {
                         error: format!("Unexpected {}", c),
                         pos: self.ptr,
                     })
                 }
-            }
+            },
         }
+    }
+
+    fn consume_dict(
+        &mut self,
+    ) -> Result<HashMap<Vec<u8>, BencodeValue>, BencodeParserError> {
+        let mut dict: HashMap<Vec<u8>, BencodeValue> = HashMap::new();
+
+        // Skip the start marker 'd'
+        self.ptr += 1;
+
+        println!("PTR: {:?}", self.ptr);
+
+        while self.data[self.ptr] as char != 'e' {
+            let key = self.consume_bytes()?;
+            println!("DICT Consumed key");
+            println!("PTR: {:?}", self.ptr);
+            let value = self.parse_value()?;
+            
+            dict.insert(key, value);
+        }
+
+        // Skip the end marker 'e'
+        self.ptr += 1;
+
+        Ok(dict)
+    }
+
+    fn consume_list(&mut self) -> Result<Vec<BencodeValue>, BencodeParserError> {
+        // Skip the start marker 'l'
+        self.ptr += 1;
+
+        let mut list: Vec<BencodeValue> = vec![];
+
+        while self.data[self.ptr] as char != 'e' {
+            list.push(self.parse_value()?);
+        }
+
+        // Skip the ending marker 'e'
+        self.ptr += 1;
+
+        Ok(list)
     }
 
     fn consume_integer(&mut self) -> Result<i64, BencodeParserError> {
@@ -74,6 +118,7 @@ impl<'data> BencodeParser<'data> {
     }
 
     fn consume_bytes(&mut self) -> Result<Vec<u8>, BencodeParserError> {
+        println!("Consuming bytes: {:?}", self.ptr);
         let Self { data, ptr } = self;
 
         let len = {
@@ -96,7 +141,10 @@ impl<'data> BencodeParser<'data> {
 
             len
         };
+        let bytes = data[(*ptr)..(*ptr + len)].to_owned();
 
-        Ok(data[(*ptr)..(*ptr + len)].to_owned())
+        *ptr += len;
+
+        Ok(bytes)
     }
 }
