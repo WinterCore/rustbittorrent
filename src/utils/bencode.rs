@@ -59,12 +59,12 @@ impl<'data> BencodeParser<'data> {
         // Skip the start marker 'd'
         self.ptr += 1;
 
-        println!("PTR: {:?}", self.ptr);
+        // println!("PTR: {:?}", self.ptr);
 
         while self.data[self.ptr] as char != 'e' {
             let key = self.consume_bytes()?;
-            println!("DICT Consumed key");
-            println!("PTR: {:?}", self.ptr);
+            // println!("DICT Consumed key");
+            // println!("PTR: {:?}", self.ptr);
             let value = self.parse_value()?;
             
             dict.insert(key, value);
@@ -118,7 +118,7 @@ impl<'data> BencodeParser<'data> {
     }
 
     fn consume_bytes(&mut self) -> Result<Vec<u8>, BencodeParserError> {
-        println!("Consuming bytes: {:?}", self.ptr);
+        // println!("Consuming bytes: {:?}", self.ptr);
         let Self { data, ptr } = self;
 
         let len = {
