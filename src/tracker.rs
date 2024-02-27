@@ -1,7 +1,7 @@
 use url::Url;
 use rand;
 
-use crate::net::udp::send_udp_data_and_receive_response;
+use crate::net::udp::send_udp_packet;
 
 #[derive(Debug)]
 pub struct Tracker<'a> {
@@ -29,7 +29,7 @@ impl<'a> Tracker<'a> {
 
         // let resp = 
 
-        let resp = send_udp_data_and_receive_response(
+        let resp = send_udp_packet(
             &self.url,
             &msg,
         ).await

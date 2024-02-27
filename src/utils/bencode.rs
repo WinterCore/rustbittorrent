@@ -1,11 +1,75 @@
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum BencodeValue {
     Integer(i64),
     Bytes(Vec<u8>),
     List(Vec<BencodeValue>),
     Dict(HashMap<Vec<u8>, BencodeValue>),
+}
+
+impl BencodeValue {
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut data: Vec<u8> = vec![];
+
+        match self {
+            Self::Integer(num) =>
+                Self::write_serialized_integer(*num, &mut data),
+            Self::Bytes(bytes) =>
+                Self::write_serialized_bytes(bytes, &mut data),
+            Self::List(list) =>
+                Self::write_serialized_list(list, &mut data),
+            Self::Dict(dict) =>
+                Self::write_serialized_dict(dict, &mut data),
+        };
+
+        data
+    }
+
+    fn write_serialized_integer(num: i64, buff: &mut Vec<u8>) {
+        buff.extend_from_slice(
+            format!("i{}e", num).as_bytes()
+        );
+    }
+
+    fn write_serialized_bytes(bytes: &[u8], buff: &mut Vec<u8>) {
+        buff.extend_from_slice(bytes.len().to_string().as_bytes());
+        buff.push(':' as u8);
+        buff.extend_from_slice(bytes);
+    }
+
+    fn write_serialized_list(list: &Vec<BencodeValue>, buff: &mut Vec<u8>) {
+        buff.push('l' as u8);
+
+        for value in list {
+            buff.extend_from_slice(&value.serialize());
+        }
+
+        buff.push('e' as u8)
+    }
+
+    fn write_serialized_dict(dict: &HashMap<Vec<u8>, BencodeValue>, buff: &mut Vec<u8>) {
+        let mut entries = dict
+            .iter()
+            .collect::<Vec<(&Vec<u8>, &BencodeValue)>>();
+
+        // TODO: Does the sorting here actually work?
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+
+        buff.push('d' as u8);
+
+        for (key, value) in entries {
+            // Write the key
+            Self::write_serialized_bytes(key, buff);
+
+            // TODO: This could be optimized by making serialize receive the buffer that it writes
+            // to instead of creating it
+            // Write the value
+            buff.extend(value.serialize());
+        }
+
+        buff.push('e' as u8);
+    }
 }
 
 impl TryFrom<&[u8]> for BencodeValue {
@@ -146,5 +210,70 @@ impl<'data> BencodeParser<'data> {
         *ptr += len;
 
         Ok(bytes)
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::utils::bencode::BencodeParser;
+
+    use super::BencodeValue;
+
+    #[test]
+    fn serializes_and_deserializes_list() {
+        let list = BencodeValue::List(Vec::from([
+            BencodeValue::Integer(15),
+            BencodeValue::Bytes("hello world".as_bytes().to_vec()),
+        ]));
+
+        let serialized = list.serialize();
+
+        let parsed = BencodeParser::new(&serialized)
+            .parse_value()
+            .unwrap();
+
+        assert_eq!(list, parsed);
+    }
+
+    #[test]
+    fn serializes_and_deserializes_complex_nested_values() {
+        let list = BencodeValue::List(Vec::from([
+            BencodeValue::Integer(15),
+            BencodeValue::Bytes("hello world".as_bytes().to_vec()),
+            BencodeValue::Dict(HashMap::from([
+                (
+                    "dict".as_bytes().to_vec(),
+                    BencodeValue::Dict(
+                        HashMap::from([
+                            (
+                                "nested_num".as_bytes().to_vec(),
+                                BencodeValue::Integer(11111),
+                            ),
+                        ])
+                    ),
+                ),
+                (
+                    "num".as_bytes().to_vec(),
+                    BencodeValue::Integer(55),
+                ),
+                (
+                    "bytes".as_bytes().to_vec(),
+                    BencodeValue::Bytes("bytes".as_bytes().to_vec()),
+                ),
+            ])),
+        ]));
+
+        let serialized = list.serialize();
+        println!("Serialized {:?}", std::str::from_utf8(&serialized));
+
+        let parsed = BencodeParser::new(&serialized)
+            .parse_value()
+            .unwrap();
+
+        assert_eq!(list, parsed);
     }
 }
