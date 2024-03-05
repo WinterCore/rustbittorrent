@@ -1,11 +1,44 @@
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap, fmt::{Debug, Formatter}, str};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub enum BencodeValue {
     Integer(i64),
     Bytes(Vec<u8>),
     List(Vec<BencodeValue>),
     Dict(HashMap<Vec<u8>, BencodeValue>),
+}
+
+impl Debug for BencodeValue {
+    // TODO: Improve this
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer(n) => print!("{}", n),
+            Self::Bytes(bytes) => {
+                if let Ok(value) = str::from_utf8(bytes) {
+                    print!("{:?}", value);
+                } else {
+                    print!("{:#04X?}", bytes);
+                }
+            },
+            Self::List(list) => {
+                print!("[\n");
+                for item in list {
+                    print!("{:?}", item);
+                }
+                print!("]\n");
+            },
+            Self::Dict(dict) => {
+                print!("{{\n");
+                for (key, value) in dict.iter() {
+                    print!("{:?}: ", BencodeValue::Bytes(key.clone()));
+                    print!("{:?}\n", value);
+                }
+                print!("}}\n");
+            },
+        }
+
+        Ok(())
+    }
 }
 
 impl BencodeValue {

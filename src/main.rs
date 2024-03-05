@@ -28,11 +28,10 @@ async fn main() {
         .collect();
 
     // We only care about udp trackers for now
-    let tracker_url = query_pairs
+    let tracker_urls: Vec<_> = query_pairs
         .iter()
-        .find(|(k, v)| k == "tr" && v.starts_with("udp://"))
-        .and_then(|x| Url::parse(&x.1).ok())
-        .expect("Magnet link should have at least 1 tracker");
+        .filter(|(k, v)| k == "xs" && v.starts_with("http"))
+        .collect();
     let node_id: Vec<u8> = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(20)
@@ -44,22 +43,52 @@ async fn main() {
     let buff = BencodeValue::Dict(
         HashMap::from([
             (
-                "id".as_bytes().to_vec(),
-                BencodeValue::Bytes(node_id.to_vec()),
+                "t".as_bytes().to_vec(),
+                BencodeValue::Bytes([0x00, 0x01].to_vec()),
+            ),
+            (
+                "y".as_bytes().to_vec(),
+                BencodeValue::Bytes("q".as_bytes().to_vec()),
             ),
             (
                 "q".as_bytes().to_vec(),
                 BencodeValue::Bytes("ping".as_bytes().to_vec()),
             ),
+            (
+                "a".as_bytes().to_vec(),
+                BencodeValue::Dict(HashMap::from([
+                    (
+                        "id".as_bytes().to_vec(),
+                        BencodeValue::Bytes([0xad, 0x70, 0xb5, 0x3c, 0xf6, 0x5e, 0xa3, 0x84, 0xc6, 0x6d, 0xed, 0xae, 0x9c, 0xb1, 0xb5, 0x8e, 0x15, 0x8b, 0xb9, 0xb3].to_vec()),
+                    ),
+                    /*
+                    (
+                        "target".as_bytes().to_vec(),
+                        BencodeValue::Bytes([0x58, 0x77, 0x07, 0x8a, 0x79, 0x0c, 0xaa, 0xe9, 0x50, 0xee, 0x0f, 0x0f, 0x38, 0xba, 0xca, 0x49, 0x78, 0x64, 0x2b, 0xb9].to_vec()),
+                    ),
+                    */
+                ])),
+            ),
         ]),
     );
 
+    // DHT Initialize node list
+    // router.utorrent.com
+    // router.bittorrent.com
+    // dht.transmissionbt.com
+
+    let custom_url = Url::parse("udp://router.bitcomet.com:6881").unwrap();
+
+    println!("Tracker urls: {:?}", tracker_urls);
+
     let resp = send_udp_packet(
-        &tracker_url,
+        &custom_url,
         &buff.serialize(),
     ).await;
 
-    println!("{:?}", resp);
+    println!("{:?}", BencodeParser::new(&resp.unwrap()).parse_value().unwrap());
+    /*
+    */
 
     // println!("Query pairs: {:?}", tracker);
 
