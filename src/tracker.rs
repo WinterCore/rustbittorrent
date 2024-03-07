@@ -14,6 +14,7 @@ impl<'a> Tracker<'a> {
     }
 
     pub async fn connect(&self) -> Result<(), String> {
+        /*
         // Build connect message
         let mut msg = [0u8; 16];
         
@@ -37,6 +38,8 @@ impl<'a> Tracker<'a> {
 
         println!("{:?}", resp);
 
+        Ok(())
+        */
         Ok(())
     }
 }

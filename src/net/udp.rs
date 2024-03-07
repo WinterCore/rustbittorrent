@@ -1,16 +1,16 @@
-use tokio::net::UdpSocket;
+use tokio::net::{UdpSocket};
 use url::Url;
 use std::{io, net::SocketAddr};
 
 
 pub async fn send_udp_packet(
-    url: &Url,
+    address: &SocketAddr,
     data: &[u8],
 ) -> io::Result<Vec<u8>> {
     // Specifying a port of 0 will make the os pick a random port for us
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
     
-    socket.connect(&*url.socket_addrs(|| None)?).await?;
+    socket.connect(address).await?;
     // let addr = "34.229.89.117:6881".parse::<SocketAddr>();
     // socket.connect(addr).await?;
     socket.send(data).await?;

@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, fmt::{Debug, Formatter}, str};
+use std::{borrow::Borrow, collections::HashMap, fmt::{Debug, Formatter, Write}, str};
 
 #[derive(PartialEq, Eq)]
 pub enum BencodeValue {
@@ -9,35 +9,49 @@ pub enum BencodeValue {
 }
 
 impl Debug for BencodeValue {
-    // TODO: Improve this
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Integer(n) => print!("{}", n),
+            Self::Integer(n) => {
+                print!("hi");
+                fmt.write_str(&n.to_string())
+            },
             Self::Bytes(bytes) => {
-                if let Ok(value) = str::from_utf8(bytes) {
-                    print!("{:?}", value);
-                } else {
-                    print!("{:#04X?}", bytes);
+                let mut list_fmt = fmt.debug_list();
+
+                for byte in bytes {
+                    list_fmt.entry(&format_args!("{:#04X}", byte));
                 }
+
+                list_fmt.finish()
             },
             Self::List(list) => {
-                print!("[\n");
+                let mut list_fmt = fmt.debug_list();
+
                 for item in list {
-                    print!("{:?}", item);
+                    list_fmt.entry(item);
                 }
-                print!("]\n");
+
+                list_fmt.finish()
             },
             Self::Dict(dict) => {
-                print!("{{\n");
+                let mut dict_fmt = fmt.debug_struct("BencodeValue::Dict");
+
                 for (key, value) in dict.iter() {
-                    print!("{:?}: ", BencodeValue::Bytes(key.clone()));
-                    print!("{:?}\n", value);
+
+                    let key = {
+                        if let Ok(string) = str::from_utf8(key) {
+                            format!("{}", string)
+                        } else {
+                            format!("{:04X?}", key)
+                        }
+                    };
+
+                    dict_fmt.field(&key, value);
                 }
-                print!("}}\n");
+
+                dict_fmt.finish()
             },
         }
-
-        Ok(())
     }
 }
 

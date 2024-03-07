@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::fs;
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use std::str;
 
+use dht_client::DHTClient;
 use net::udp::send_udp_packet;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -15,6 +19,7 @@ use tracker::Tracker;
 mod net;
 mod tracker;
 mod utils;
+mod dht_client;
 
 #[tokio::main]
 async fn main() {
@@ -27,18 +32,34 @@ async fn main() {
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
 
+    let hash = query_pairs
+        .iter()
+        .find(|x| x.0 == "xt")
+        .map(|x| &x.1)
+        .expect("Magnet link should contain infohash");
+
+    let root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(67, 215, 246, 10)), 6881);
+    
+    let mut dht_client = DHTClient::new(&root_node);
+
+    dht_client.get_peers(hash).await;
+
+    /*
+    let infohash = query_pairs
+        .iter()
+        .filter_map(|x| {
+            if x.0 ==
+        })
+        */
+
+    /*
     // We only care about udp trackers for now
     let tracker_urls: Vec<_> = query_pairs
         .iter()
         .filter(|(k, v)| k == "xs" && v.starts_with("http"))
         .collect();
-    let node_id: Vec<u8> = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(20)
-        .collect();
+    let node_id: [u8; 20] = rand::thread_rng().gen::<[u8; 20]>();
 
-    println!("URL: {:?}", query_pairs);
-    
     // Ping 
     let buff = BencodeValue::Dict(
         HashMap::from([
@@ -59,7 +80,7 @@ async fn main() {
                 BencodeValue::Dict(HashMap::from([
                     (
                         "id".as_bytes().to_vec(),
-                        BencodeValue::Bytes([0xad, 0x70, 0xb5, 0x3c, 0xf6, 0x5e, 0xa3, 0x84, 0xc6, 0x6d, 0xed, 0xae, 0x9c, 0xb1, 0xb5, 0x8e, 0x15, 0x8b, 0xb9, 0xb3].to_vec()),
+                        BencodeValue::Bytes(node_id.to_vec()),
                     ),
                     /*
                     (
@@ -77,7 +98,7 @@ async fn main() {
     // router.bittorrent.com
     // dht.transmissionbt.com
 
-    let custom_url = Url::parse("udp://router.bitcomet.com:6881").unwrap();
+    let custom_url = Url::parse("udp://router.bittorrent.com:6881").unwrap();
 
     println!("Tracker urls: {:?}", tracker_urls);
 
@@ -86,13 +107,10 @@ async fn main() {
         &buff.serialize(),
     ).await;
 
-    println!("{:?}", BencodeParser::new(&resp.unwrap()).parse_value().unwrap());
-    /*
-    */
+    println!("{:#?}", BencodeParser::new(&resp.unwrap()).parse_value().unwrap());
 
     // println!("Query pairs: {:?}", tracker);
 
-    /*
     let torrent_file_data = fs::read("./test-torrent.torrent")
         .expect("Should read file");
 
