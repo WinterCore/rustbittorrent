@@ -1,20 +1,14 @@
-use std::collections::HashMap;
-use std::fs;
+use std::io;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
+use std::net::SocketAddrV4;
 use std::str;
 
 use dht_client::DHTClient;
-use net::udp::send_udp_packet;
-use rand::distributions::Alphanumeric;
-use rand::Rng;
-use rand::RngCore;
 use url::Url;
-use utils::bencode::BencodeParser;
-
 use utils::bencode::BencodeValue;
-use tracker::Tracker;
+use utils::hex::decode_hex;
 
 mod net;
 mod tracker;
@@ -22,7 +16,7 @@ mod utils;
 mod dht_client;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     let magnet = "magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fbig-buck-bunny.torrent";
 
 
@@ -38,11 +32,41 @@ async fn main() {
         .map(|x| &x.1)
         .expect("Magnet link should contain infohash");
 
-    let root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(67, 215, 246, 10)), 6881);
-    
-    let mut dht_client = DHTClient::new(&root_node);
+    let mut root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(87,98,162,88)), 6881);
+    let mut i = 0;
+    println!("--------------Hash: {:?}", hash);
+    /*
+    panic!("END");
+    */
 
-    dht_client.get_peers(hash).await;
+    // router.utorrent.com
+    // router.bittorrent.com
+    // dht.transmissionbt.com
+
+    let infohash_bytes = decode_hex(hash.split(":").last().unwrap()).unwrap();
+    
+    loop {
+        if i == 2 {
+            break;
+        }
+
+        let mut dht_client = DHTClient::new(&root_node);
+
+        let get_peers_data = dht_client.get_peers("hi".as_bytes()).await?;
+        println!("{} PEERS DATA: {:?}", i, get_peers_data);
+        let nb = get_peers_data
+            .dict().unwrap()
+            .get("r".as_bytes()).unwrap()
+            .dict().unwrap()
+            .get("nodes".as_bytes()).unwrap()
+            .bytes().unwrap();
+        
+            let node_id = &nb[0..20];
+            let node_ip = SocketAddrV4::new(Ipv4Addr::new(nb[20], nb[21], nb[22], nb[23]), u16::from_be_bytes([nb[24], nb[25]]));
+            root_node = SocketAddr::V4(node_ip);
+
+        i += 1;
+    }
 
     /*
     let infohash = query_pairs
@@ -137,4 +161,7 @@ async fn main() {
     
     println!("URL: {:?}", url);
     */
+
+
+    Ok(())
 }

@@ -56,6 +56,34 @@ impl Debug for BencodeValue {
 }
 
 impl BencodeValue {
+    pub fn integer(&self) -> Result<&i64, BencodeCastError> {
+        match self {
+            Self::Integer(int) => Ok(int),
+            _ => Err(BencodeCastError),
+        }
+    }
+
+    pub fn bytes(&self) -> Result<&Vec<u8>, BencodeCastError> {
+        match self {
+            Self::Bytes(bytes) => Ok(bytes),
+            _ => Err(BencodeCastError),
+        }
+    }
+
+    pub fn list(&self) -> Result<&Vec<BencodeValue>, BencodeCastError> {
+        match self {
+            Self::List(vec) => Ok(vec),
+            _ => Err(BencodeCastError),
+        }
+    }
+
+    pub fn dict(&self) -> Result<&HashMap<Vec<u8>, BencodeValue>, BencodeCastError> {
+        match self {
+            Self::Dict(dict) => Ok(dict),
+            _ => Err(BencodeCastError),
+        }
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
         let mut data: Vec<u8> = vec![];
 
@@ -132,6 +160,9 @@ pub struct BencodeParserError {
     error: String,
     pos: usize,
 }
+
+#[derive(Debug)]
+pub struct BencodeCastError;
 
 #[derive(Debug)]
 pub struct BencodeParser<'data> {
