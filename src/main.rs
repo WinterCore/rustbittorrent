@@ -44,29 +44,12 @@ async fn main() -> io::Result<()> {
     // dht.transmissionbt.com
 
     let infohash_bytes = decode_hex(hash.split(":").last().unwrap()).unwrap();
-    
-    loop {
-        if i == 2 {
-            break;
-        }
 
-        let mut dht_client = DHTClient::new(&root_node);
+    let mut dht_client = DHTClient::new(&root_node);
 
-        let get_peers_data = dht_client.get_peers("hi".as_bytes()).await?;
-        println!("{} PEERS DATA: {:?}", i, get_peers_data);
-        let nb = get_peers_data
-            .dict().unwrap()
-            .get("r".as_bytes()).unwrap()
-            .dict().unwrap()
-            .get("nodes".as_bytes()).unwrap()
-            .bytes().unwrap();
-        
-            let node_id = &nb[0..20];
-            let node_ip = SocketAddrV4::new(Ipv4Addr::new(nb[20], nb[21], nb[22], nb[23]), u16::from_be_bytes([nb[24], nb[25]]));
-            root_node = SocketAddr::V4(node_ip);
+    let get_peers_data = dht_client.get_peers("hi".as_bytes()).await.unwrap();
 
-        i += 1;
-    }
+    println!("{:?}", get_peers_data);
 
     /*
     let infohash = query_pairs
