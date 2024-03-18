@@ -63,8 +63,6 @@ impl TryFrom<&BencodeValue> for DHTBaseResponse {
     type Error = String;
 
     fn try_from(value: &BencodeValue) -> Result<Self, Self::Error> {
-        let dict = value.dict().map_err(|_| "BencodeValue should be an object")?;
-
         let r = get_resp_dict(value)?;
 
         let node_id: [u8; 20] = r
@@ -94,8 +92,12 @@ pub struct DHTGetPeersResponse {
     /// sure
     pub token: Option<Vec<u8>>,
 
+    /// Nodes that we can contact asking for an infohash
     /// [node_id(20 bytes), ip(4 bytes), port(2 bytes), ...]
     pub nodes: Vec<CompactNodeInfo>,
+
+    /// Peers for the provided infohash (nodes that have the torrent?)
+    pub values: Vec<SocketAddrV4>,
 }
 
 impl TryFrom<&BencodeValue> for DHTGetPeersResponse {
@@ -119,13 +121,62 @@ impl TryFrom<&BencodeValue> for DHTGetPeersResponse {
             .map(|bytes| CompactNodeInfo::from(bytes))
             .collect();
 
-        let get_peers_resp = Self {
+        let values = r
+            .get("values".as_bytes())
+            .and_then(|x| x.bytes().ok())
+            .map(|bytes| {
+                bytes
+                    .chunks(6)
+                    .map(|bs| {
+                        SocketAddrV4::new(
+                            Ipv4Addr::new(bs[0], bs[1], bs[2], bs[3]),
+                            u16::from_be_bytes([bs[4], bs[5]])
+                        )
+                    })
+                    .collect()
+            }).unwrap_or(vec![]);
+
+        let resp = Self {
             base,
             token,
             nodes,
+            values,
         };
 
-        return Ok(get_peers_resp)
+        return Ok(resp)
+    }
+}
+
+#[derive(Debug)]
+pub struct DHTFindNodeResponse {
+    pub base: DHTBaseResponse,
+
+    pub nodes: Vec<CompactNodeInfo>,
+}
+
+impl TryFrom<&BencodeValue> for DHTFindNodeResponse {
+    type Error = String;
+
+    fn try_from(value: &BencodeValue) -> Result<Self, Self::Error> {
+        println!("Parsing {:?}", value);
+        let base = DHTBaseResponse::try_from(value)?;
+
+        let r = get_resp_dict(&value)?;
+
+        let nodes = r
+            .get("nodes".as_bytes())
+            .and_then(|x| x.bytes().ok())
+            .ok_or("Failed to parse response error message")?
+            .chunks(26)
+            .map(|bytes| CompactNodeInfo::from(bytes))
+            .collect();
+
+        let resp = Self {
+            base,
+            nodes,
+        };
+
+        return Ok(resp)
     }
 }
 
@@ -142,10 +193,9 @@ impl TryFrom<&BencodeValue> for DHTErrorResponse {
 
     fn try_from(value: &BencodeValue) -> Result<Self, Self::Error> {
         let base = DHTBaseResponse::try_from(value)?;
+        let root_dict = value.dict().map_err(|_| "BencodeValue should be an object")?;
 
-        let r = get_resp_dict(value)?;
-
-        let e = r
+        let e = root_dict
             .get("e".as_bytes())
             .and_then(|x| x.list().ok())
             .ok_or("Failed to parse response error")?;
@@ -235,7 +285,7 @@ impl<'node> DHTClient<'node> {
         }
     }
 
-    pub async fn get_peers(&mut self, infohash: &[u8]) -> Result<DHTResponse<DHTGetPeersResponse>, String> {
+    pub async fn get_peers(&self, infohash: &[u8]) -> Result<DHTResponse<DHTGetPeersResponse>, String> {
         let query = BencodeValue::Dict(
             HashMap::from([
                 (
@@ -275,6 +325,50 @@ impl<'node> DHTClient<'node> {
             .map_err(|_| "Failed to parse bencode response")?;
 
         let response = DHTResponse::<DHTGetPeersResponse>::try_from(&value)?;
+        
+        Ok(response)
+    }
+
+    pub async fn find_node(&self, target: &[u8]) -> Result<DHTResponse<DHTFindNodeResponse>, String> {
+        let query = BencodeValue::Dict(
+            HashMap::from([
+                (
+                    "t".as_bytes().to_vec(),
+                    BencodeValue::Bytes(self.tx_id.to_be_bytes().to_vec()),
+                ),
+                (
+                    "y".as_bytes().to_vec(),
+                    BencodeValue::Bytes("q".as_bytes().to_vec()),
+                ),
+                (
+                    "q".as_bytes().to_vec(),
+                    BencodeValue::Bytes("find_node".as_bytes().to_vec()),
+                ),
+                (
+                    "a".as_bytes().to_vec(),
+                    BencodeValue::Dict(HashMap::from([
+                        (
+                            "id".as_bytes().to_vec(),
+                            BencodeValue::Bytes(self.node_id.to_vec()),
+                        ),
+                        (
+                            "target".as_bytes().to_vec(),
+                            BencodeValue::Bytes(target.to_owned()),
+                        ),
+                    ])),
+                ),
+            ]),
+        );
+
+        let resp = send_udp_packet(self.root_node, &query.serialize())
+            .await
+            .map_err(|x| format!("Failed to send udp packet {}", x.to_string()))?;
+
+        let value = BencodeParser::new(&resp)
+            .parse_value()
+            .map_err(|_| "Failed to parse bencode response")?;
+
+        let response = DHTResponse::<DHTFindNodeResponse>::try_from(&value)?;
         
         Ok(response)
     }

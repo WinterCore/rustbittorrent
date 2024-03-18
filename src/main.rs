@@ -4,16 +4,19 @@ use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::net::SocketAddrV4;
 use std::str;
+use std::time::Duration;
 
-use dht_client::DHTClient;
+use dht_client::{DHTClient, DHTResponse, CompactNodeInfo};
+use tokio::time::sleep;
 use url::Url;
 use utils::bencode::BencodeValue;
-use utils::hex::decode_hex;
+use utils::hex::{decode_hex, encode_hex};
 
 mod net;
 mod tracker;
 mod utils;
 mod dht_client;
+mod peer_client;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -32,24 +35,45 @@ async fn main() -> io::Result<()> {
         .map(|x| &x.1)
         .expect("Magnet link should contain infohash");
 
-    let mut root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(87,98,162,88)), 6881);
-    let mut i = 0;
-    println!("--------------Hash: {:?}", hash);
-    /*
-    panic!("END");
-    */
+    println!("Infohash: {:?}", hash);
 
     // router.utorrent.com
     // router.bittorrent.com
     // dht.transmissionbt.com
+    let mut root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(87,98,162,88)), 6881);
 
     let infohash_bytes = decode_hex(hash.split(":").last().unwrap()).unwrap();
 
-    let mut dht_client = DHTClient::new(&root_node);
 
-    let get_peers_data = dht_client.get_peers("hi".as_bytes()).await.unwrap();
 
-    println!("{:?}", get_peers_data);
+    let dht_client = DHTClient::new(&root_node);
+
+    let nodes = {
+
+        let get_peers_resp = dht_client.get_peers(&infohash_bytes).await.unwrap();
+
+
+        match get_peers_resp {
+            DHTResponse::DHTError(err) => {
+                println!("DHTResponse error {:?}", err);
+                None
+            },
+            DHTResponse::DHTResponse(resp) => {
+                if resp.values.len() > 0 {
+                    None
+                } else {
+                    Some(resp.nodes)
+                }
+            },
+        }
+    }.unwrap();
+    
+    let first_node = nodes.first().unwrap();
+
+    let socket_addr = SocketAddr::V4(first_node.socket_addr);
+    let dht_client = DHTClient::new(&socket_addr);
+    let find_node_resp = dht_client.find_node(&infohash_bytes).await;
+    println!("Debug: find_node {:?}", find_node_resp);
 
     /*
     let infohash = query_pairs

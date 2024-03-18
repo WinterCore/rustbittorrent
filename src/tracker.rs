@@ -1,6 +1,6 @@
 use url::Url;
-use rand;
 
+use rand;
 use crate::net::udp::send_udp_packet;
 
 #[derive(Debug)]
