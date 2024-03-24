@@ -253,6 +253,15 @@ pub enum DHTResponse<T> {
     DHTResponse(T),
 }
 
+impl<T> DHTResponse<T> {
+    pub fn unwrap(self) -> T {
+        match self {
+            DHTResponse::DHTResponse(data) => data,
+            _ => panic!("Unwrap DHTRespose failed"),
+        }
+    }
+}
+
 impl<'a, T: TryFrom<&'a BencodeValue, Error = String>> TryFrom<&'a BencodeValue> for DHTResponse<T> {
     type Error = String;
 
@@ -285,7 +294,7 @@ impl<'node> DHTClient<'node> {
         }
     }
 
-    pub async fn get_peers(&self, infohash: &[u8]) -> Result<DHTResponse<DHTGetPeersResponse>, String> {
+    pub async fn get_peers(&self, infohash: &[u8; 20]) -> Result<DHTResponse<DHTGetPeersResponse>, String> {
         let query = BencodeValue::Dict(
             HashMap::from([
                 (
@@ -309,7 +318,7 @@ impl<'node> DHTClient<'node> {
                         ),
                         (
                             "info_hash".as_bytes().to_vec(),
-                            BencodeValue::Bytes(infohash.to_owned()),
+                            BencodeValue::Bytes(infohash.to_vec()),
                         ),
                     ])),
                 ),

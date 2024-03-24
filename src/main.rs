@@ -11,6 +11,7 @@ use tokio::time::sleep;
 use url::Url;
 use utils::bencode::BencodeValue;
 use utils::hex::{decode_hex, encode_hex};
+use peer_client::PeerClient;
 
 mod net;
 mod tracker;
@@ -42,38 +43,42 @@ async fn main() -> io::Result<()> {
     // dht.transmissionbt.com
     let mut root_node = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(87,98,162,88)), 6881);
 
-    let infohash_bytes = decode_hex(hash.split(":").last().unwrap()).unwrap();
+    let infohash_bytes: [u8; 20] = decode_hex(hash.split(":").last().unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
 
 
 
     let dht_client = DHTClient::new(&root_node);
 
-    let nodes = {
+    let get_peers_resp = dht_client
+        .get_peers(&infohash_bytes)
+        .await
+        .unwrap()
+        .unwrap();
 
-        let get_peers_resp = dht_client.get_peers(&infohash_bytes).await.unwrap();
+    let node = get_peers_resp.nodes.first().unwrap();
 
+    let mut peer_client = PeerClient::connect(
+        &node.socket_addr,
+        &infohash_bytes,
+        &dht_client.node_id,
+    ).await
+    .unwrap();
 
-        match get_peers_resp {
-            DHTResponse::DHTError(err) => {
-                println!("DHTResponse error {:?}", err);
-                None
-            },
-            DHTResponse::DHTResponse(resp) => {
-                if resp.values.len() > 0 {
-                    None
-                } else {
-                    Some(resp.nodes)
-                }
-            },
-        }
-    }.unwrap();
+    peer_client.send_handshake().await.unwrap();
     
+    // println!("{:?}", node);
+    
+    /*
     let first_node = nodes.first().unwrap();
 
     let socket_addr = SocketAddr::V4(first_node.socket_addr);
     let dht_client = DHTClient::new(&socket_addr);
     let find_node_resp = dht_client.find_node(&infohash_bytes).await;
     println!("Debug: find_node {:?}", find_node_resp);
+    */
 
     /*
     let infohash = query_pairs
