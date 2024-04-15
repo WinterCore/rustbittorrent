@@ -13,6 +13,6 @@ pub fn encode_hex(bytes: &[u8]) -> String {
 pub fn decode_hex(hex_string: &str) -> Result<Vec<u8>, ParseIntError> {
     (0..hex_string.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&hex_string[i..(i + 1)], 16))
+        .map(|i| u8::from_str_radix(&hex_string[i..(i + 2)], 16))
         .collect()
 }

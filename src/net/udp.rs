@@ -11,8 +11,6 @@ pub async fn send_udp_packet(
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
     
     socket.connect(address).await?;
-    // let addr = "34.229.89.117:6881".parse::<SocketAddr>();
-    // socket.connect(addr).await?;
     socket.send(data).await?;
 
     println!("Data sent: {:x?}", data);

@@ -15,9 +15,9 @@ pub struct PeerClient<'addr> {
 
 impl<'addr> PeerClient<'addr> {
     pub async fn connect(
+        node_id: &[u8; 20],
         socket_addr: &'addr SocketAddrV4,
         infohash: &[u8; 20],
-        node_id: &[u8; 20],
     ) -> io::Result<Self> {
         let stream = TcpStream::connect(socket_addr).await?;
 
@@ -39,8 +39,10 @@ impl<'addr> PeerClient<'addr> {
         handshake_data.extend_from_slice(&self.node_id);
 
         self.stream.write_all(&handshake_data).await?;
+        println!("HANDSHAKE DATA: {:02X?}", handshake_data);
 
         let mut buf = [0u8; 68];
+        // let mut buf = Vec::new();
         let resp = self.stream.read_exact(&mut buf).await?;
         println!("Received TCP resp: {:?} {:?}", buf, resp);
         /*

@@ -1,6 +1,7 @@
-use std::{collections::HashMap, io, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, str};
+use std::{collections::HashMap, io, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, str, time::Duration};
 
 use rand::Rng;
+use tokio::time::timeout;
 
 use crate::{net::udp::send_udp_packet, utils::bencode::{BencodeParser, BencodeValue}};
 
@@ -276,16 +277,15 @@ impl<'a, T: TryFrom<&'a BencodeValue, Error = String>> TryFrom<&'a BencodeValue>
 }
 
 #[derive(Debug)]
-pub struct DHTClient<'node> {
-    pub node_id: [u8; 20],
+pub struct DHTClient<'nodeId, 'node> {
+    pub node_id: &'nodeId [u8; 20],
     pub root_node: &'node SocketAddr,
 
     tx_id: u16,
 }
 
-impl<'node> DHTClient<'node> {
-    pub fn new(root_node: &'node SocketAddr) -> Self {
-        let node_id = rand::thread_rng().gen::<[u8; 20]>();
+impl<'node, 'nodeId> DHTClient<'nodeId, 'node> {
+    pub fn new(node_id: &'nodeId [u8; 20], root_node: &'node SocketAddr) -> Self {
 
         Self {
             node_id,
@@ -325,9 +325,12 @@ impl<'node> DHTClient<'node> {
             ]),
         );
 
-        let resp = send_udp_packet(self.root_node, &query.serialize())
-            .await
-            .map_err(|x| format!("Failed to send udp packet {}", x.to_string()))?;
+        let resp = timeout(
+            Duration::from_secs(5),
+            send_udp_packet(self.root_node, &query.serialize()),
+        ).await
+        .map_err(|x| format!("Timeout reached {}", x.to_string()))?
+        .map_err(|x| format!("Failed to send udp packet {}", x.to_string()))?;
 
         let value = BencodeParser::new(&resp)
             .parse_value()
