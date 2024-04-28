@@ -13,7 +13,6 @@ pub async fn send_udp_packet(
     socket.connect(address).await?;
     socket.send(data).await?;
 
-    println!("Data sent: {:x?}", data);
     println!("Waiting for response");
     let mut resp_buf = [0u8; 65_535];
     let bytes_count = socket.recv(&mut resp_buf).await?;

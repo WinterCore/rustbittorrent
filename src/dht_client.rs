@@ -5,7 +5,7 @@ use tokio::time::timeout;
 
 use crate::{net::udp::send_udp_packet, utils::bencode::{BencodeParser, BencodeValue}};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompactNodeInfo {
     pub node_id: [u8; 20],
     pub socket_addr: SocketAddrV4,
@@ -159,7 +159,6 @@ impl TryFrom<&BencodeValue> for DHTFindNodeResponse {
     type Error = String;
 
     fn try_from(value: &BencodeValue) -> Result<Self, Self::Error> {
-        println!("Parsing {:?}", value);
         let base = DHTBaseResponse::try_from(value)?;
 
         let r = get_resp_dict(&value)?;
@@ -372,9 +371,12 @@ impl<'node, 'nodeId> DHTClient<'nodeId, 'node> {
             ]),
         );
 
-        let resp = send_udp_packet(self.root_node, &query.serialize())
-            .await
-            .map_err(|x| format!("Failed to send udp packet {}", x.to_string()))?;
+        let resp = timeout(
+            Duration::from_secs(3),
+            send_udp_packet(self.root_node, &query.serialize())
+        ).await
+        .map_err(|x| format!("Timeout reached {}", x.to_string()))?
+        .map_err(|x| format!("Failed to send udp packet {}", x.to_string()))?;
 
         let value = BencodeParser::new(&resp)
             .parse_value()
