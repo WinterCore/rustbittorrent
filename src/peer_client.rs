@@ -1,12 +1,12 @@
-use std::{io, net::{Ipv4Addr, SocketAddrV4}};
+use std::{io, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, time::Duration};
 
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream, time::timeout};
 
 
 
 #[derive(Debug)]
 pub struct PeerClient<'addr> {
-    pub socket_addr: &'addr SocketAddrV4,
+    pub socket_addr: &'addr SocketAddr,
     pub infohash: [u8; 20],
     pub node_id: [u8; 20],
     
@@ -16,10 +16,10 @@ pub struct PeerClient<'addr> {
 impl<'addr> PeerClient<'addr> {
     pub async fn connect(
         node_id: &[u8; 20],
-        socket_addr: &'addr SocketAddrV4,
+        socket_addr: &'addr SocketAddr,
         infohash: &[u8; 20],
     ) -> io::Result<Self> {
-        let stream = TcpStream::connect(socket_addr).await?;
+        let stream = timeout(Duration::from_secs(3), TcpStream::connect(socket_addr)).await??;
 
         Ok(Self {
             infohash: infohash.clone(),

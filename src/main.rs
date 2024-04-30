@@ -1,10 +1,11 @@
-use std::{io, net::ToSocketAddrs};
+use std::{io, net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs}};
 
 use rand::Rng;
 use url::Url;
 use utils::hex::{decode_hex, encode_hex};
 
 use net::udp::send_udp_packet;
+use peer_client::PeerClient;
 
 mod net;
 mod tracker;
@@ -80,9 +81,32 @@ async fn main() -> io::Result<()> {
 
     println!("Announce data: {:?}", announce_response);
 
-    for ip in announce_response[20..].chunks(6) {
-        println!("Found ip: {:?}, port: {:?}", &ip[0..4], &ip[4..]);
+    let peers = announce_response[20..]
+        .chunks(6)
+        .map(|bytes| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]), u16::from_be_bytes([bytes[4], bytes[5]]))))
+        .collect::<Vec<SocketAddr>>();
+
+    println!("---------------------------------------");
+    for peer_addr in peers {
+        println!("Trying to connect to {:?}", peer_addr);
+
+        let peer_connection = PeerClient::connect(&node_id, &peer_addr, &infohash_bytes).await;
+
+        if let Err(err) = peer_connection {
+            println!("Error connecting to {:?}: {:?}", peer_addr, err);
+
+            continue;
+        }
+
+        println!("Connected successfully to {:?}: {:?}", peer_addr, peer_connection);
+
+        let handshake_result = peer_connection.unwrap().send_handshake().await;
+
+        println!("Handshake result {:?}: {:?}", peer_addr, handshake_result);
+
+        break;
     }
+
 
     Ok(())
 }
