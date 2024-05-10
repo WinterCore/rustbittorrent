@@ -2,22 +2,21 @@ use std::{io, net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs}};
 
 use rand::Rng;
 use url::Url;
-use utils::hex::{decode_hex, encode_hex};
+use utils::hex::decode_hex;
 
 use net::udp::send_udp_packet;
-use peer_client::PeerClient;
+use bittorrent::peer_client::PeerClient;
 
 mod net;
 mod tracker;
 mod utils;
 mod dht_client;
-mod peer_client;
+mod bittorrent;
 mod kademlia;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let magnet = "magnet:?xt=urn:btih:6853ab2b86b2cb6a3c778b8aafe3dffd94242321&dn=archlinux-2024.04.01-x86_64.iso";
-
 
     let url = Url::parse(magnet).expect("Should parse magnet link");
     let query_pairs: Vec<(String, String)> = url
