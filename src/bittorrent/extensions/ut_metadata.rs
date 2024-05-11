@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::utils::bencode::BencodeValue;
 use crate::bittorrent::extensions::Extension;
 
@@ -11,7 +13,7 @@ impl Extension for UTMetadata {
     const NAME: &'static str = "ut_metadata";
 
     async fn process_packet(&self, data: &[u8]) -> () {
-
+        
     }
 }
 
@@ -37,7 +39,18 @@ impl UTMetadata {
         0
     }
 
-    fn get_request_payload(&self) -> BencodeValue {
+    fn get_request_message(&self) -> Vec<u8> {
         let index = self.next_piece_index();
+
+        BencodeValue::Dict(HashMap::from([
+            (
+                "msg_type".as_bytes().to_vec(),
+                BencodeValue::Integer(0),
+            ),
+            (
+                "piece".as_bytes().to_vec(),
+                BencodeValue::Integer(index),
+            )
+        ])).serialize()
     }
 }

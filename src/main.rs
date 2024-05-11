@@ -8,11 +8,11 @@ use net::udp::send_udp_packet;
 use bittorrent::peer_client::PeerClient;
 
 mod net;
-mod tracker;
 mod utils;
 mod dht_client;
 mod bittorrent;
 mod kademlia;
+mod tracker;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {

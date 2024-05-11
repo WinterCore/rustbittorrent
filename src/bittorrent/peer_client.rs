@@ -3,7 +3,6 @@ use std::{io, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, time::Duration};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream, time::timeout};
 
 
-
 #[derive(Debug)]
 pub struct PeerClient<'addr> {
     pub socket_addr: &'addr SocketAddr,
